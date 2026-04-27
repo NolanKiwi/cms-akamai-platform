@@ -1,0 +1,39 @@
+{
+  "name": "cms-akamai-platform",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "test:unit": "turbo run test:unit",
+    "test:integration": "turbo run test:integration",
+    "test:e2e": "turbo run test:e2e",
+    "test:akamai": "bash tests/akamai/validate-cache-headers.sh",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "db:migrate": "turbo run db:migrate --filter=cms-api",
+    "db:migrate:test": "NODE_ENV=test turbo run db:migrate --filter=cms-api",
+    "db:seed": "turbo run db:seed --filter=cms-api",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "infra:staging:plan": "cd infra/terraform/environments/staging && terraform plan",
+    "infra:staging:apply": "cd infra/terraform/environments/staging && terraform apply",
+    "infra:production:plan": "cd infra/terraform/environments/production && terraform plan"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0",
+    "prettier": "^3.2.0",
+    "eslint": "^9.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}
