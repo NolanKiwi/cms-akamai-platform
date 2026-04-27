@@ -2,10 +2,21 @@ version: "3.9"
 
 # ─────────────────────────────────────────────────────────────
 # CMS Akamai Platform — Local Development Stack
-# Usage:
-#   npm run docker:up        start all services
-#   npm run docker:down      stop all services
-#   npm run docker:logs      follow logs
+# 포트 전략: 17xxx 대역 (타 서비스 충돌 회피)
+#   CMS API:              17000
+#   CMS Admin:            17001
+#   Web Frontend:         17002
+#   PostgreSQL:           17432
+#   Redis:                17379
+#   OpenSearch:           17200
+#   OpenSearch Dashboards:17601
+#   MinIO API:            17900
+#   MinIO Console:        17901
+#   Prometheus:           17090
+#   Grafana:              17300
+#   Mailhog SMTP:         17025
+#   Mailhog Web:          17825
+#   Jaeger (traces):      17686
 # ─────────────────────────────────────────────────────────────
 
 services:
@@ -20,7 +31,7 @@ services:
       POSTGRES_USER: cms_admin
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cms_dev_password}
     ports:
-      - "5432:5432"
+      - "17432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
@@ -35,9 +46,14 @@ services:
     image: redis:7-alpine
     container_name: cms-redis
     restart: unless-stopped
-    command: redis-server --requirepass ${REDIS_PASSWORD:-cms_dev_redis} --appendonly yes
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-cms_dev_redis}
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
     ports:
-      - "6379:6379"
+      - "17379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -55,12 +71,13 @@ services:
       - discovery.type=single-node
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_PASSWORD:-CmsD3v@dm1n!}
       - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - plugins.security.ssl.http.enabled=false
     ports:
-      - "9200:9200"
+      - "17200:9200"
     volumes:
       - opensearch_data:/usr/share/opensearch/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -74,13 +91,12 @@ services:
       opensearch:
         condition: service_healthy
     environment:
-      OPENSEARCH_HOSTS: '["https://opensearch:9200"]'
-      OPENSEARCH_USERNAME: admin
-      OPENSEARCH_PASSWORD: ${OPENSEARCH_PASSWORD:-CmsD3v@dm1n!}
+      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
+      DISABLE_SECURITY_DASHBOARDS_PLUGIN: "true"
     ports:
-      - "5601:5601"
+      - "17601:5601"
 
-  # ── MinIO (S3-compatible local storage) ────────────────────
+  # ── MinIO (S3-compatible) ──────────────────────────────────
   minio:
     image: minio/minio:latest
     container_name: cms-minio
@@ -90,8 +106,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-cms_dev_access}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-cms_dev_secret_key_123}
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "17900:9000"
+      - "17901:9001"
     volumes:
       - minio_data:/data
     healthcheck:
@@ -100,7 +116,7 @@ services:
       timeout: 10s
       retries: 3
 
-  # ── MinIO bucket setup (one-shot) ──────────────────────────
+  # ── MinIO bucket 초기화 ────────────────────────────────────
   minio-setup:
     image: minio/mc:latest
     container_name: cms-minio-setup
@@ -114,7 +130,8 @@ services:
         mc mb --ignore-existing local/cms-video-source-dev;
         mc mb --ignore-existing local/cms-video-processed-dev;
         mc mb --ignore-existing local/cms-logs-dev;
-        echo 'MinIO buckets ready';
+        mc anonymous set download local/cms-media-dev;
+        echo 'MinIO 버킷 준비 완료';
       "
     restart: "no"
 
@@ -124,16 +141,18 @@ services:
     container_name: cms-prometheus
     restart: unless-stopped
     ports:
-      - "9090:9090"
+      - "17090:9090"
     volumes:
       - ./infra/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/observability/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
       - prometheus_data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
-      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
-      - "--web.console.templates=/usr/share/prometheus/consoles"
       - "--web.enable-lifecycle"
+      - "--storage.tsdb.retention.time=30d"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   # ── Grafana ────────────────────────────────────────────────
   grafana:
@@ -146,20 +165,33 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-cms_dev_grafana}
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_HTTP_PORT: "3000"
     ports:
-      - "3100:3000"
+      - "17300:3000"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./infra/observability/grafana/provisioning:/etc/grafana/provisioning:ro
 
-  # ── Mailhog (local email testing) ──────────────────────────
+  # ── Jaeger (분산 추적) ────────────────────────────────────
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: cms-jaeger
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "17686:16686"   # Jaeger UI
+      - "17317:4317"    # OTLP gRPC
+      - "17318:4318"    # OTLP HTTP
+
+  # ── Mailhog (로컬 이메일 테스트) ──────────────────────────
   mailhog:
     image: mailhog/mailhog:latest
     container_name: cms-mailhog
     restart: unless-stopped
     ports:
-      - "1025:1025"   # SMTP
-      - "8025:8025"   # Web UI
+      - "17025:1025"    # SMTP
+      - "17825:8025"    # Web UI
 
 volumes:
   postgres_data:

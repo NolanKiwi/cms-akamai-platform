@@ -1,0 +1,22 @@
+{
+  "name": "reporting-worker",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node dist/main.js",
+    "build": "tsc",
+    "dev": "ts-node src/main.ts"
+  },
+  "dependencies": {
+    "pg": "^8.12.0",
+    "dotenv": "^16.4.5",
+    "node-cron": "^3.0.3",
+    "@opensearch-project/opensearch": "^2.11.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.3",
+    "@types/node": "^20.14.9",
+    "@types/node-cron": "^3.0.11",
+    "ts-node": "^10.9.2"
+  }
+}
