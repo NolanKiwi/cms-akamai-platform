@@ -3,6 +3,8 @@ import Cookies from 'js-cookie';
 
 const TOKEN_KEY = 'cms_token';
 
+export const AUTH_EVENT = 'dimi-cms:session-expired';
+
 export const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:17000/api/v1',
   headers: { 'Content-Type': 'application/json' },
@@ -17,9 +19,17 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401 && typeof window !== 'undefined') {
+    if (
+      err.response?.status === 401 &&
+      typeof window !== 'undefined' &&
+      !window.location.pathname.startsWith('/auth/')
+    ) {
       Cookies.remove(TOKEN_KEY);
-      window.location.href = '/auth/login';
+      window.dispatchEvent(new CustomEvent(AUTH_EVENT));
+      // small delay to let the toast paint before navigating away
+      setTimeout(() => {
+        window.location.href = '/auth/login';
+      }, 700);
     }
     return Promise.reject(err);
   },

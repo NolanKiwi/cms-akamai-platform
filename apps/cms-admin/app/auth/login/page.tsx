@@ -1,7 +1,12 @@
 'use client';
+
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, setToken } from '@/lib/api';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,27 +31,63 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="bg-white rounded-xl border border-gray-200 p-8 w-full max-w-md shadow-sm">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">CMS Admin</h1>
-        <p className="text-gray-500 text-sm mb-6">Sign in to continue</p>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          {error && <p className="text-red-600 text-sm">{error}</p>}
-          <button type="submit" disabled={loading}
-            className="w-full bg-blue-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
-            {loading ? 'Signing in...' : 'Sign in'}
-          </button>
-        </form>
+    <div
+      className="flex min-h-screen items-center justify-center bg-sidebar p-6"
+      style={{
+        backgroundImage:
+          'radial-gradient(1200px 600px at 80% -10%, hsl(var(--primary) / 0.18), transparent 60%), radial-gradient(900px 600px at 0% 100%, hsl(var(--accent) / 0.12), transparent 60%)',
+      }}
+    >
+      <div className="w-full max-w-sm">
+        <div className="mb-6 flex items-center justify-center gap-2 text-sidebar-foreground">
+          <span className="grid h-9 w-9 place-items-center rounded-md bg-primary text-primary-foreground text-base font-bold">
+            d
+          </span>
+          <span className="text-lg font-semibold tracking-tight">dimi-cms</span>
+        </div>
+
+        <Card className="border-white/10 bg-background/95 shadow-2xl backdrop-blur">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg">Sign in</CardTitle>
+            <p className="text-sm text-muted-foreground">Use your dimi-cms account to continue.</p>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                />
+              </div>
+              {error && (
+                <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
+              )}
+              <Button type="submit" disabled={loading} className="w-full">
+                {loading ? 'Signing in…' : 'Sign in'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <p className="mt-4 text-center text-xs text-sidebar-foreground/60">
+          dimi-cms · content delivery & cache control console
+        </p>
       </div>
     </div>
   );

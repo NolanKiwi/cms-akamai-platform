@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: { default: 'CMS Web', template: '%s | CMS Web' },
-  description: 'Powered by CMS Akamai Platform',
+  title: { default: 'dimi-cms', template: '%s · dimi-cms' },
+  description: 'Public web frontend powered by dimi-cms',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

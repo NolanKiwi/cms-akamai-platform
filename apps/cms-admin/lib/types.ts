@@ -8,13 +8,34 @@ export interface User {
   role: UserRole;
 }
 
+export interface SiteTheme {
+  primary?: string;
+  accent?: string;
+  background?: string;
+  foreground?: string;
+  radius?: string;
+}
+
+export interface SiteBranding {
+  logoUrl?: string;
+  faviconUrl?: string;
+  tagline?: string;
+}
+
 export interface Site {
   id: string;
   name: string;
   slug: string;
-  domain: string;
+  hostname?: string;
+  domain?: string;
+  description?: string | null;
   locales: string[];
   defaultLocale: string;
+  isActive?: boolean;
+  theme?: SiteTheme | null;
+  branding?: SiteBranding | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ContentEntry {

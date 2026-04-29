@@ -1,3 +1,4 @@
+import DOMPurify from 'isomorphic-dompurify';
 import { searchContent } from '@/lib/cms';
 
 interface Props {
@@ -11,29 +12,47 @@ export default async function SearchPage({ params, searchParams }: Props) {
   const results = q ? await searchContent(params.siteId, q, { page }) : null;
 
   return (
-    <main className="max-w-4xl mx-auto px-6 py-12">
-      <h1 className="text-2xl font-bold mb-6">Search</h1>
-      <form action="" className="flex gap-2 mb-8">
-        <input name="q" defaultValue={q} placeholder="Search content..."
-          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">
+    <main className="mx-auto max-w-3xl px-6 py-12">
+      <h1 className="text-2xl font-semibold tracking-tight text-foreground">Search</h1>
+      <form action="" className="mt-6 flex gap-2">
+        <input
+          name="q"
+          defaultValue={q}
+          placeholder="Search content…"
+          className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+        />
+        <button
+          type="submit"
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+        >
           Search
         </button>
       </form>
+
       {results && (
-        <div>
-          <p className="text-sm text-gray-500 mb-4">{results.total} results for &quot;{q}&quot;</p>
-          <div className="space-y-4">
-            {results.items.map((item: any) => (
-              <div key={item.id} className="bg-white rounded-lg border border-gray-200 p-4">
-                <h2 className="font-semibold text-gray-900">{item.title}</h2>
-                {item.highlights?.body && (
-                  <p className="text-sm text-gray-500 mt-1"
-                    dangerouslySetInnerHTML={{ __html: item.highlights.body[0] }} />
-                )}
-              </div>
-            ))}
-          </div>
+        <div className="mt-8 space-y-3">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+            {results.total} results for &ldquo;{q}&rdquo;
+          </p>
+          {results.items.map((item: any) => (
+            <article
+              key={item.id}
+              className="rounded-md border border-border bg-card p-4 transition-colors hover:border-primary/40"
+            >
+              <h2 className="font-medium text-foreground">{item.title}</h2>
+              {item.highlights?.body && (
+                <p
+                  className="mt-1 text-sm text-muted-foreground"
+                  dangerouslySetInnerHTML={{
+                    __html: DOMPurify.sanitize(item.highlights.body[0], {
+                      ALLOWED_TAGS: ['em', 'strong', 'mark', 'b', 'i'],
+                      ALLOWED_ATTR: [],
+                    }),
+                  }}
+                />
+              )}
+            </article>
+          ))}
         </div>
       )}
     </main>

@@ -105,6 +105,14 @@ export class AssetsService {
     return this.repo.findOne({ where: { id } });
   }
 
+  async deleteAsset(id: string) {
+    const asset = await this.repo.findOne({ where: { id } });
+    if (!asset) throw new BadRequestException('에셋을 찾을 수 없습니다.');
+    // S3 객체 삭제는 별도 워커/정리 작업에서 처리. 여기서는 DB row 제거만.
+    await this.repo.delete(id);
+    return { deleted: true, id };
+  }
+
   private validateMimeType(mimeType: string) {
     if (!ALLOWED_MIME_TYPES.some(t => mimeType.startsWith(t.split('/')[0]) || mimeType === t)) {
       throw new BadRequestException(`허용되지 않는 파일 형식: ${mimeType}`);

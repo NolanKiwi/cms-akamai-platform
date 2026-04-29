@@ -1,35 +1,36 @@
 # Implementation TODO
 
-## Phase 0: Discovery (2 weeks) — NEXT
+## Phase 0: Discovery (2 weeks)
 - [ ] Schedule stakeholder workshops (editorial, dev, legal, security, marketing)
 - [ ] Confirm Akamai contract entitlements (critical: AMD, IVM, Bot Manager, EdgeWorkers, DataStream 2, Site Shield)
 - [ ] Audit existing CMS (if any) — extract content types and redirects
 - [ ] Confirm cloud provider regions and networking topology
 - [ ] Confirm OIDC/SSO provider (Google Workspace / Okta / Azure AD)
-- [ ] Define supported content types and locales
+- [x] Define supported content types and locales
 - [ ] Review GDPR / data residency requirements
-- [ ] Confirm domain strategy and DNS provider
+- [x] Confirm domain strategy and DNS provider (duckdns staging on dimicms.duckdns.org)
 - [ ] Review performance targets with business stakeholders
 - [ ] Obtain Akamai API credentials (PAPI for Terraform, Fast Purge API, EdgeKV API)
-- [ ] Set up GitHub org, monorepo skeleton, branch protection rules
+- [x] Set up GitHub org, monorepo skeleton, branch protection rules
 - [ ] Set up AWS accounts (dev, staging, production) with separate IAM
 - [ ] Confirm video transcoding approach (AWS MediaConvert vs Mux vs FFmpeg)
 
-## Phase 1: MVP CMS Core (6 weeks)
+## Phase 1: MVP CMS Core (6 weeks) — IN PROGRESS
 - [ ] Provision staging infrastructure (Terraform: RDS, Redis, S3, EKS, OpenSearch)
-- [ ] NestJS CMS API scaffold: health, auth, RBAC modules
-- [ ] PostgreSQL schema: apply all migrations from docs/03-low-level-design.md
-- [ ] Content CRUD: create, read, update, archive, version history
-- [ ] Editorial workflow state machine: draft → in_review → published → archived
-- [ ] Next.js admin console: login (OIDC), dashboard, content list, form editor
-- [ ] OIDC SSO integration
-- [ ] S3 integration: presigned upload URL, MIME validation
-- [ ] Redis: session management, rate limiting (NestJS throttler)
-- [ ] Audit log: all mutations captured
-- [ ] Docker Compose for full local stack
+- [x] NestJS CMS API scaffold: health, auth, RBAC modules
+- [x] PostgreSQL schema: apply all migrations from docs/03-low-level-design.md
+- [x] Content CRUD: create, read, update, archive, version history
+- [x] Editorial workflow state machine: draft → in_review → published → archived
+- [x] Next.js admin console: login, dashboard, content list, form editor
+- [ ] OIDC SSO integration (currently local JWT auth only)
+- [x] S3 integration: presigned upload URL, MIME validation
+- [x] Redis: session management, rate limiting (NestJS throttler)
+- [x] Audit log: all mutations captured
+- [x] Docker Compose for full local stack
 - [ ] Unit tests: 80% coverage target
-- [ ] Integration tests: all CRUD + workflow endpoints
+- [x] Integration tests: CRUD + workflow endpoints (initial pass)
 - [ ] GitHub Actions: CI pipeline (lint, typecheck, test, build)
+- [x] API Tester page in admin console (system menu) for ad-hoc auth'd requests
 
 ## Phase 2: Akamai Static/Dynamic Delivery (4 weeks)
 - [ ] Terraform: Akamai property `cms-production-www` + CP codes
@@ -37,37 +38,38 @@
 - [ ] TLS certificates via Akamai CPS
 - [ ] Origin protection: Site Shield firewall rule (or shared-secret fallback)
 - [ ] Security headers injection rule
-- [ ] HTTP → HTTPS redirect rule
+- [ ] HTTP → HTTPS redirect rule (currently nginx-level on duckdns)
 - [ ] Stale-while-revalidate configuration
 - [ ] Brotli + gzip compression
-- [ ] Surrogate-Control + Surrogate-Key headers in Next.js frontend and NestJS API
+- [x] Surrogate-Control + Surrogate-Key headers in Next.js frontend and NestJS API
 - [ ] Akamai staging activation and validation
 - [ ] Cache behavior tests: static hit ratio, security headers, redirects
 - [ ] DNS: CNAME staging subdomain to Akamai edge
 
-## Phase 3: Publishing Pipeline and Purge (3 weeks)
-- [ ] BullMQ queues: publish, purge, webhook, search
-- [ ] Publisher worker: state machine execution, DB update, event emit
-- [ ] Purge worker: tag dependency resolution, Akamai Fast Purge API calls
-- [ ] Akamai Fast Purge client (packages/akamai-client)
-- [ ] Cache tag generation for all content types
-- [ ] Purge log: purge_log table + admin console UI
-- [ ] Webhook worker: HMAC-signed delivery + retry
+## Phase 3: Publishing Pipeline and Purge (3 weeks) — PARTIAL
+- [x] BullMQ queues: publish, purge, webhook, search
+- [x] Publisher worker: state machine execution, DB update, event emit
+- [x] Purge worker: tag dependency resolution, Akamai Fast Purge API calls
+- [x] Akamai Fast Purge client (apps/cms-api/src/akamai)
+- [x] Cache tag generation for all content types
+- [x] Purge log: purge_log table + admin console UI
+- [x] Webhook worker: HMAC-signed delivery + retry
 - [ ] Search indexer: OpenSearch index on publish
-- [ ] Emergency purge UI in admin console
+- [x] Emergency purge UI in admin console
 - [ ] Grafana dashboard: publishing pipeline metrics
 - [ ] End-to-end test: publish → cache miss within 30s
 
-## Phase 4: Image/Media Optimization (4 weeks)
+## Phase 4: Image/Media Optimization (4 weeks) — PARTIAL
 - [ ] Akamai property: `cms-production-media` + IVM policy
-- [ ] S3 media buckets (originals, thumbnails, documents)
-- [ ] CMS API: presigned upload, MIME re-validation, malware scan
+- [x] S3 media buckets (originals, thumbnails, documents) — local storage adapter in dev
+- [x] CMS API: presigned upload, MIME re-validation
 - [ ] Image processing: sharp (dimensions, EXIF strip, thumbnail generation)
 - [ ] Focal point: storage in DB, crop hint to IVM
-- [ ] Admin console: DAM browser, upload UI, metadata editor, focal point picker
-- [ ] Content type fields: media_reference, image picker
-- [ ] Asset cache tag linking to referencing content
+- [x] Admin console: DAM browser, upload UI, metadata editor (basic)
+- [x] Content type fields: media_reference, image picker
+- [x] Asset cache tag linking to referencing content
 - [ ] WebP/AVIF delivery test
+- [ ] Malware scan integration
 
 ## Phase 5: Streaming VOD (6 weeks)
 - [ ] Akamai AMD property: `cms-production-streams`

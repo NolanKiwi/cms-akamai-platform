@@ -23,14 +23,16 @@
     "docker:logs": "docker compose logs -f",
     "infra:staging:plan": "cd infra/terraform/environments/staging && terraform plan",
     "infra:staging:apply": "cd infra/terraform/environments/staging && terraform apply",
-    "infra:production:plan": "cd infra/terraform/environments/production && terraform plan"
+    "infra:production:plan": "cd infra/terraform/environments/production && terraform plan",
+    "api:types": "bash scripts/generate-api-types.sh"
   },
   "devDependencies": {
-    "turbo": "^2.0.0",
-    "typescript": "^5.4.0",
     "@types/node": "^20.0.0",
+    "eslint": "^9.0.0",
+    "openapi-typescript": "^7.13.0",
     "prettier": "^3.2.0",
-    "eslint": "^9.0.0"
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0"
   },
   "engines": {
     "node": ">=20.0.0",

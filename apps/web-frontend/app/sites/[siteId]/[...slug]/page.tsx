@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { headers } from 'next/headers';
+import DOMPurify from 'isomorphic-dompurify';
 import { getContent } from '@/lib/cms';
 import type { Metadata } from 'next';
 
@@ -25,31 +25,39 @@ export default async function ContentPage({ params }: Props) {
   const { data, surrogateKey } = result;
 
   return (
-    <main className="max-w-4xl mx-auto px-6 py-12">
+    <main className="mx-auto max-w-3xl px-6 py-12">
       <article>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">
+        <div className="mb-6 text-xs font-medium uppercase tracking-[0.18em] text-primary">
+          {contentType}
+        </div>
+        <h1 className="text-3xl font-semibold leading-tight tracking-tight text-foreground sm:text-4xl">
           {data.currentVersion?.title || slugPath}
         </h1>
         {data.publishedAt && (
-          <time className="text-sm text-gray-400 block mb-6">
+          <time className="mt-4 block text-sm text-muted-foreground">
             {new Date(data.publishedAt).toLocaleDateString('ko-KR', {
-              year: 'numeric', month: 'long', day: 'numeric',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
             })}
           </time>
         )}
-        <div className="prose prose-gray max-w-none">
+        <div className="mt-8 border-t border-border pt-8 text-foreground/90">
           {typeof data.currentVersion?.fields?.body === 'string' && (
-            <div dangerouslySetInnerHTML={{ __html: data.currentVersion.fields.body }} />
+            <div
+              className="prose prose-neutral max-w-none prose-headings:tracking-tight prose-a:text-primary"
+              dangerouslySetInnerHTML={{
+                __html: DOMPurify.sanitize(data.currentVersion.fields.body, {
+                  USE_PROFILES: { html: true },
+                }),
+              }}
+            />
           )}
         </div>
       </article>
-      {/* Cache tags passed via Surrogate-Key header for Akamai/ISR invalidation */}
-      {surrogateKey && (
-        <meta name="x-surrogate-key" content={surrogateKey} />
-      )}
+      {surrogateKey && <meta name="x-surrogate-key" content={surrogateKey} />}
     </main>
   );
 }
 
-// ISR: revalidate every 60 seconds
 export const revalidate = 60;

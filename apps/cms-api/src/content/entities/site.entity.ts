@@ -1,6 +1,20 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany,
+  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn,
 } from 'typeorm';
+
+export interface SiteTheme {
+  primary?: string;
+  accent?: string;
+  background?: string;
+  foreground?: string;
+  radius?: string;
+}
+
+export interface SiteBranding {
+  logoUrl?: string;
+  faviconUrl?: string;
+  tagline?: string;
+}
 
 @Entity('sites')
 export class Site {
@@ -12,6 +26,9 @@ export class Site {
 
   @Column({ length: 255 })
   name: string;
+
+  @Column({ type: 'text', nullable: true })
+  description: string | null;
 
   @Column('text', { array: true, default: ['en'] })
   locales: string[];
@@ -25,6 +42,15 @@ export class Site {
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
+  @Column({ type: 'jsonb', nullable: true })
+  theme: SiteTheme | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  branding: SiteBranding | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
 }

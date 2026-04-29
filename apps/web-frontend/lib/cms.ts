@@ -1,5 +1,39 @@
 const API_URL = process.env.CMS_API_URL || 'http://localhost:17000/api/v1';
 
+export interface SiteTheme {
+  primary?: string;
+  accent?: string;
+  background?: string;
+  foreground?: string;
+  radius?: string;
+}
+
+export interface SiteBranding {
+  logoUrl?: string;
+  faviconUrl?: string;
+  tagline?: string;
+}
+
+export interface PublicSite {
+  id: string;
+  slug: string;
+  name: string;
+  description?: string | null;
+  hostname?: string | null;
+  locales: string[];
+  defaultLocale: string;
+  theme?: SiteTheme | null;
+  branding?: SiteBranding | null;
+}
+
+export async function getSite(idOrSlug: string): Promise<PublicSite | null> {
+  const res = await fetch(`${API_URL}/sites/${idOrSlug}`, {
+    next: { revalidate: 300, tags: [`site:${idOrSlug}`] },
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
 export async function getContent(siteId: string, contentType: string, slug: string, locale = 'en') {
   const res = await fetch(
     `${API_URL}/content/${siteId}/${contentType}/${slug}?locale=${locale}`,

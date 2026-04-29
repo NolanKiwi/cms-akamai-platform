@@ -1,94 +1,228 @@
 'use client';
-import { useState } from 'react';
+
+import { useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowRight, Plus, Search, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
-import Link from 'next/link';
+import { useActiveSite } from '@/lib/active-site';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { useToast } from '@/components/ui/toast';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+
+interface Redirect {
+  id: string;
+  fromPath: string;
+  toPath: string;
+  statusCode: number;
+  isActive: boolean;
+}
+
+interface RedirectListResponse {
+  items: Redirect[];
+  total: number;
+}
+
+async function fetchRedirects(siteId: string): Promise<RedirectListResponse> {
+  const res = await api.get(`/admin/redirects?siteId=${siteId}&size=100`);
+  return res.data;
+}
 
 export default function RedirectsPage() {
+  const [activeSiteId, setActiveSiteId] = useActiveSite();
   const [siteId, setSiteId] = useState('');
-  const [data, setData] = useState<any>(null);
+  useEffect(() => {
+    if (activeSiteId && !siteId) setSiteId(activeSiteId);
+  }, [activeSiteId]);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [status, setStatus] = useState('301');
 
-  async function load() {
-    if (!siteId) return;
-    const res = await api.get(`/admin/redirects?siteId=${siteId}&size=100`);
-    setData(res.data);
-  }
+  const qc = useQueryClient();
+  const toast = useToast();
 
-  async function create() {
-    await api.post('/admin/redirects', { siteId, fromPath: from, toPath: to, statusCode: +status });
-    setFrom(''); setTo('');
-    load();
-  }
+  const { data, isFetching, error } = useQuery({
+    queryKey: ['redirects', activeSiteId],
+    queryFn: () => fetchRedirects(activeSiteId),
+    enabled: !!activeSiteId,
+  });
 
-  async function remove(id: string) {
-    await api.delete(`/admin/redirects/${id}`);
-    load();
-  }
+  const create = useMutation({
+    mutationFn: () =>
+      api.post('/admin/redirects', {
+        siteId: activeSiteId,
+        fromPath: from,
+        toPath: to,
+        statusCode: +status,
+      }),
+    onSuccess: () => {
+      setFrom('');
+      setTo('');
+      qc.invalidateQueries({ queryKey: ['redirects', activeSiteId] });
+      toast.success('Redirect added');
+    },
+    onError: (err: any) =>
+      toast.error('Failed to add redirect', err.response?.data?.message || err.message),
+  });
+
+  const remove = useMutation<unknown, any, string, { previous?: RedirectListResponse }>({
+    mutationFn: (id: string) => api.delete(`/admin/redirects/${id}`),
+    onMutate: async (id) => {
+      const key = ['redirects', activeSiteId];
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData<RedirectListResponse>(key);
+      if (previous) {
+        qc.setQueryData<RedirectListResponse>(key, {
+          ...previous,
+          items: previous.items.filter((r) => r.id !== id),
+          total: Math.max(0, previous.total - 1),
+        });
+      }
+      return { previous };
+    },
+    onError: (err, _id, context) => {
+      if (context?.previous) {
+        qc.setQueryData(['redirects', activeSiteId], context.previous);
+      }
+      toast.error('Failed to delete redirect', err?.response?.data?.message || err?.message);
+    },
+    onSuccess: () => toast.success('Redirect deleted'),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['redirects', activeSiteId] }),
+  });
+
+  const errorMessage = error
+    ? (error as any).response?.data?.message || (error as Error).message
+    : '';
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center gap-4 max-w-7xl mx-auto">
-          <Link href="/dashboard" className="text-gray-500 hover:text-gray-900 text-sm">← Dashboard</Link>
-          <h1 className="text-xl font-semibold text-gray-900">Redirects</h1>
-        </div>
-      </header>
-      <main className="max-w-5xl mx-auto px-6 py-8">
-        <div className="flex gap-3 mb-6">
-          <input value={siteId} onChange={e => setSiteId(e.target.value)}
-            placeholder="Site ID" className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-72" />
-          <button onClick={load} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">Load</button>
-        </div>
+    <>
+      <PageHeader
+        title="Redirects"
+        description="URL redirect rules per site. Applied at the edge."
+        breadcrumbs={[
+          { label: 'dimi-cms', href: '/dashboard' },
+          { label: 'Content Delivery' },
+          { label: 'Redirects' },
+        ]}
+      />
 
-        {siteId && (
-          <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
-            <h2 className="font-semibold mb-3 text-sm">Add Redirect</h2>
-            <div className="flex gap-2 flex-wrap">
-              <input value={from} onChange={e => setFrom(e.target.value)} placeholder="/old-path"
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-40" />
-              <input value={to} onChange={e => setTo(e.target.value)} placeholder="/new-path"
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-40" />
-              <select value={status} onChange={e => setStatus(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                <option value="301">301</option>
-                <option value="302">302</option>
-                <option value="307">307</option>
-                <option value="308">308</option>
-              </select>
-              <button onClick={create} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm">Add</button>
-            </div>
-          </div>
+      <div className="flex max-w-5xl flex-col gap-4 px-6 py-6">
+        <Card>
+          <CardContent className="flex flex-wrap items-center gap-3 p-4">
+            <Input
+              value={siteId}
+              onChange={(e) => setSiteId(e.target.value)}
+              placeholder="Site ID (UUID)"
+              className="max-w-sm"
+            />
+            <Button onClick={() => siteId && setActiveSiteId(siteId)} disabled={!siteId || isFetching} size="sm">
+              <Search className="h-4 w-4" />
+              Load
+            </Button>
+            {data && <span className="ml-auto text-xs text-muted-foreground">{data.total} rules</span>}
+          </CardContent>
+        </Card>
+
+        {errorMessage && (
+          <Card>
+            <CardContent className="py-4 text-sm text-destructive">{errorMessage}</CardContent>
+          </Card>
+        )}
+
+        {activeSiteId && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Add redirect</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-wrap items-end gap-2">
+              <div className="min-w-[10rem] flex-1">
+                <Input value={from} onChange={(e) => setFrom(e.target.value)} placeholder="/old-path" />
+              </div>
+              <ArrowRight className="mb-2.5 h-4 w-4 text-muted-foreground" />
+              <div className="min-w-[10rem] flex-1">
+                <Input value={to} onChange={(e) => setTo(e.target.value)} placeholder="/new-path" />
+              </div>
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {['301', '302', '307', '308'].map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button onClick={() => create.mutate()} disabled={!from || !to || create.isPending} size="sm">
+                <Plus className="h-4 w-4" />
+                {create.isPending ? 'Adding…' : 'Add'}
+              </Button>
+            </CardContent>
+          </Card>
         )}
 
         {data && (
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-xs uppercase text-gray-600">
-                <tr>
-                  {['From', 'To', 'Code', 'Active', ''].map(h => (
-                    <th key={h} className="text-left px-4 py-3 font-medium">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {data.items.map((r: any) => (
-                  <tr key={r.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-mono text-xs">{r.fromPath}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-blue-600">{r.toPath}</td>
-                    <td className="px-4 py-3">{r.statusCode}</td>
-                    <td className="px-4 py-3">{r.isActive ? '✓' : '✗'}</td>
-                    <td className="px-4 py-3">
-                      <button onClick={() => remove(r.id)} className="text-red-600 text-xs hover:underline">Delete</button>
-                    </td>
-                  </tr>
+          <Card className="overflow-hidden p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>From</TableHead>
+                  <TableHead>To</TableHead>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Active</TableHead>
+                  <TableHead className="w-12" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.items.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
+                      No redirects yet.
+                    </TableCell>
+                  </TableRow>
+                )}
+                {data.items.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="font-mono text-xs">{r.fromPath}</TableCell>
+                    <TableCell className="font-mono text-xs text-primary">{r.toPath}</TableCell>
+                    <TableCell>
+                      <Badge variant="muted" className="font-mono">
+                        {r.statusCode}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {r.isActive ? <Badge variant="success">Active</Badge> : <Badge variant="muted">Off</Badge>}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Delete"
+                        disabled={remove.isPending}
+                        onClick={() => remove.mutate(r.id)}
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+            </Table>
+          </Card>
         )}
-      </main>
-    </div>
+      </div>
+    </>
   );
 }

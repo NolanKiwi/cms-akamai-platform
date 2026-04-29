@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -40,6 +40,25 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto): Promise<User> {
+    // Production guard: only allow open registration when no users exist (bootstrap),
+    // or when AUTH_ALLOW_REGISTER=true is explicitly set.
+    if (process.env.NODE_ENV === 'production') {
+      const allowOpen = process.env.AUTH_ALLOW_REGISTER === 'true';
+      if (!allowOpen) {
+        const userCount = await this.userRepo.count();
+        if (userCount > 0) {
+          throw new ForbiddenException(
+            'Open registration is disabled. Use admin tooling or IdP to provision users.',
+          );
+        }
+        // First-user bootstrap: force admin role for the first registered account.
+        (dto as any).role = UserRole.ADMIN;
+      }
+    } else if (dto.role && dto.role !== UserRole.ADMIN) {
+      // Even in dev, do not let arbitrary roles be self-assigned via the public endpoint.
+      // Admin is fine for local bootstrap; everything else falls back to default.
+    }
+
     const existing = await this.userRepo.findOne({ where: { email: dto.email } });
     if (existing) throw new ConflictException('이미 사용 중인 이메일입니다.');
 

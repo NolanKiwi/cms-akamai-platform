@@ -18,6 +18,10 @@ async function bootstrap() {
   const config = app.get(ConfigService);
   const port = config.get<number>('CMS_API_PORT', 17000);
 
+  // Trust reverse proxy (nginx) for correct req.ip / X-Forwarded-* handling
+  const httpAdapter = app.getHttpAdapter().getInstance() as any;
+  if (typeof httpAdapter.set === 'function') httpAdapter.set('trust proxy', 1);
+
   // Security
   app.use(helmet({
     contentSecurityPolicy: false, // Swagger UI 호환
@@ -25,15 +29,28 @@ async function bootstrap() {
   app.use(compression());
 
   // CORS (admin console + frontend)
+  const corsExtra = (config.get<string>('CORS_ORIGINS') || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const publicBase = config.get<string>('PUBLIC_BASE_URL') || '';
+  const corsOrigins = Array.from(
+    new Set(
+      [
+        `http://localhost:${config.get('CMS_ADMIN_PORT', 17001)}`,
+        `http://localhost:${config.get('WEB_FRONTEND_PORT', 17002)}`,
+        publicBase,
+        ...corsExtra,
+      ].filter(Boolean),
+    ),
+  );
   app.enableCors({
-    origin: [
-      `http://localhost:${config.get('CMS_ADMIN_PORT', 17001)}`,
-      `http://localhost:${config.get('WEB_FRONTEND_PORT', 17002)}`,
-    ],
+    origin: corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Api-Key', 'X-Preview-Token'],
   });
+  logger.log(`CORS allow-list: ${corsOrigins.join(', ')}`);
 
   // Global prefix
   app.setGlobalPrefix('api/v1');

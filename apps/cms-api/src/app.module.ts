@@ -17,6 +17,7 @@ import { AuditModule } from './audit/audit.module';
 import { PreviewModule } from './preview/preview.module';
 import { RedirectsModule } from './redirects/redirects.module';
 import { HealthModule } from './health/health.module';
+import { AkamaiModule } from './akamai/akamai.module';
 import { databaseConfig } from './config/database.config';
 import { redisConfig } from './config/redis.config';
 
@@ -70,6 +71,7 @@ import { redisConfig } from './config/redis.config';
     PreviewModule,
     RedirectsModule,
     HealthModule,
+    AkamaiModule,
   ],
 })
 export class AppModule {}

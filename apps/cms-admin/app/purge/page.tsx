@@ -1,77 +1,133 @@
 'use client';
+
 import { useState } from 'react';
+import { Tag, Link as LinkIcon, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { api } from '@/lib/api';
-import Link from 'next/link';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { useToast } from '@/components/ui/toast';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/cn';
 
 export default function PurgePage() {
   const [tags, setTags] = useState('');
   const [urls, setUrls] = useState('');
   const [result, setResult] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<'tags' | 'urls' | null>(null);
+  const toast = useToast();
 
-  async function purgeTags() {
-    setLoading(true);
+  async function run(kind: 'tags' | 'urls') {
+    setLoading(kind);
+    setResult(null);
     try {
-      const tagList = tags.split('\n').map(t => t.trim()).filter(Boolean);
-      const res = await api.post('/admin/purge/tags', { tags: tagList, reason: 'Manual purge' });
-      setResult(res.data);
+      const items = (kind === 'tags' ? tags : urls)
+        .split('\n')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const res = await api.post(`/admin/purge/${kind}`, { [kind]: items, reason: 'Manual purge' });
+      setResult({ ok: true, data: res.data });
+      toast.success(
+        `Purge by ${kind} submitted`,
+        `${items.length} ${kind === 'tags' ? 'tag(s)' : 'url(s)'} queued`,
+      );
     } catch (e: any) {
-      setResult({ error: e.response?.data?.message || e.message });
+      setResult({ ok: false, error: e.response?.data?.message || e.message });
+      toast.error('Purge failed', e.response?.data?.message || e.message);
     } finally {
-      setLoading(false);
-    }
-  }
-
-  async function purgeUrls() {
-    setLoading(true);
-    try {
-      const urlList = urls.split('\n').map(u => u.trim()).filter(Boolean);
-      const res = await api.post('/admin/purge/urls', { urls: urlList, reason: 'Manual purge' });
-      setResult(res.data);
-    } catch (e: any) {
-      setResult({ error: e.response?.data?.message || e.message });
-    } finally {
-      setLoading(false);
+      setLoading(null);
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center gap-4 max-w-7xl mx-auto">
-          <Link href="/dashboard" className="text-gray-500 hover:text-gray-900 text-sm">← Dashboard</Link>
-          <h1 className="text-xl font-semibold text-gray-900">Cache Purge</h1>
-        </div>
-      </header>
-      <main className="max-w-3xl mx-auto px-6 py-8 space-y-6">
-        <div className="bg-white rounded-lg border border-gray-200 p-5">
-          <h2 className="font-semibold mb-3">Purge by Cache Tags</h2>
-          <textarea value={tags} onChange={e => setTags(e.target.value)}
-            placeholder="One tag per line (e.g. article:uuid, site:default)"
-            rows={5} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono" />
-          <button onClick={purgeTags} disabled={loading || !tags.trim()}
-            className="mt-3 bg-orange-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-orange-600 disabled:opacity-50">
-            Purge Tags
-          </button>
-        </div>
+    <>
+      <PageHeader
+        title="Cache Purge"
+        description="Invalidate edge cache by cache tag or URL. Submissions are queued for the purge worker."
+        breadcrumbs={[
+          { label: 'dimi-cms', href: '/dashboard' },
+          { label: 'Operations' },
+          { label: 'Purge' },
+        ]}
+      />
 
-        <div className="bg-white rounded-lg border border-gray-200 p-5">
-          <h2 className="font-semibold mb-3">Purge by URLs</h2>
-          <textarea value={urls} onChange={e => setUrls(e.target.value)}
-            placeholder="One URL per line"
-            rows={5} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono" />
-          <button onClick={purgeUrls} disabled={loading || !urls.trim()}
-            className="mt-3 bg-orange-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-orange-600 disabled:opacity-50">
-            Purge URLs
-          </button>
-        </div>
+      <div className="grid max-w-4xl gap-4 px-6 py-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Tag className="h-4 w-4 text-primary" />
+              Purge by cache tags
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              One tag per line. Examples: <code className="rounded bg-muted px-1 py-0.5">article:uuid</code>,{' '}
+              <code className="rounded bg-muted px-1 py-0.5">site:default</code>
+            </p>
+          </CardHeader>
+          <CardContent>
+            <textarea
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              rows={5}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+            />
+            <div className="mt-3 flex justify-end">
+              <Button onClick={() => run('tags')} disabled={loading !== null || !tags.trim()} size="sm">
+                {loading === 'tags' ? 'Submitting…' : 'Purge tags'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <LinkIcon className="h-4 w-4 text-primary" />
+              Purge by URLs
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">One URL per line. Full path including scheme.</p>
+          </CardHeader>
+          <CardContent>
+            <textarea
+              value={urls}
+              onChange={(e) => setUrls(e.target.value)}
+              rows={5}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+            />
+            <div className="mt-3 flex justify-end">
+              <Button onClick={() => run('urls')} disabled={loading !== null || !urls.trim()} size="sm">
+                {loading === 'urls' ? 'Submitting…' : 'Purge URLs'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {result && (
-          <div className={`rounded-lg border p-4 text-sm ${result.error ? 'bg-red-50 border-red-200 text-red-700' : 'bg-green-50 border-green-200 text-green-700'}`}>
-            <pre className="whitespace-pre-wrap">{JSON.stringify(result, null, 2)}</pre>
-          </div>
+          <Card
+            className={cn(
+              'border-l-4',
+              result.ok ? 'border-l-success bg-success/5' : 'border-l-destructive bg-destructive/5',
+            )}
+          >
+            <CardContent className="space-y-2 p-4">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                {result.ok ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 text-success" />
+                    Submitted
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="h-4 w-4 text-destructive" />
+                    Failed
+                  </>
+                )}
+              </div>
+              <pre className="overflow-auto rounded-md bg-muted/50 p-3 text-xs text-foreground/80">
+                {JSON.stringify(result.data ?? result.error, null, 2)}
+              </pre>
+            </CardContent>
+          </Card>
         )}
-      </main>
-    </div>
+      </div>
+    </>
   );
 }

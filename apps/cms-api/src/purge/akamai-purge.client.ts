@@ -34,7 +34,9 @@ export class AkamaiPurgeClient {
     this.clientToken = config.get<string>('AKAMAI_CLIENT_TOKEN', '');
     this.clientSecret = config.get<string>('AKAMAI_CLIENT_SECRET', '');
     this.accessToken = config.get<string>('AKAMAI_ACCESS_TOKEN', '');
-    this.dryRun = !this.host || config.get('NODE_ENV') === 'development';
+    // dry-run only when AKAMAI_HOST is missing or empty.
+    // Use AKAMAI_NETWORK=staging as the safety knob for non-prod testing.
+    this.dryRun = !this.host;
   }
 
   async invalidate(req: PurgeRequest): Promise<PurgeResponse> {

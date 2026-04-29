@@ -1,0 +1,64 @@
+# Production compose stack — apps run as built images (not nest start --watch).
+# Bring up alongside the existing infra services:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# All three Next/Nest apps live behind the host's nginx reverse proxy
+# (see infra/nginx/dimicms.duckdns.org.conf).
+
+services:
+  cms-api:
+    build:
+      context: .
+      dockerfile: apps/cms-api/Dockerfile
+    container_name: dimi-cms-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://cms_admin:${POSTGRES_PASSWORD}@postgres:5432/cms
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      S3_ENDPOINT: http://minio:9000
+    ports:
+      - "127.0.0.1:17000:17000"
+    volumes:
+      - ./apps/cms-api/keys:/app/keys:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_started }
+      minio:    { condition: service_started }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:17000/api/v1/health | grep -q ok || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  cms-admin:
+    build:
+      context: .
+      dockerfile: apps/cms-admin/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_BASE_URL:-https://dimicms.duckdns.org}/api/v1
+    container_name: dimi-cms-admin
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+    ports:
+      - "127.0.0.1:17001:17001"
+    depends_on:
+      cms-api: { condition: service_healthy }
+
+  web-frontend:
+    build:
+      context: .
+      dockerfile: apps/web-frontend/Dockerfile
+    container_name: dimi-cms-web
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      CMS_API_URL: http://cms-api:17000/api/v1
+    ports:
+      - "127.0.0.1:17002:17002"
+    depends_on:
+      cms-api: { condition: service_healthy }

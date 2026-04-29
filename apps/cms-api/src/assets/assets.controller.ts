@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, Req } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { IsString, IsNumber, IsOptional, IsArray, IsUUID } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
@@ -64,5 +64,12 @@ export class AssetsController {
   @Roles(UserRole.EDITOR, UserRole.PUBLISHER, UserRole.DEVELOPER, UserRole.ADMIN)
   async updateMeta(@Param('id') id: string, @Body() dto: UpdateMetaDto) {
     return this.assetsService.updateMetadata(id, dto);
+  }
+
+  @Delete(':id')
+  @Roles(UserRole.PUBLISHER, UserRole.DEVELOPER, UserRole.ADMIN)
+  @ApiOperation({ summary: '에셋 삭제' })
+  async deleteAsset(@Param('id') id: string) {
+    return this.assetsService.deleteAsset(id);
   }
 }

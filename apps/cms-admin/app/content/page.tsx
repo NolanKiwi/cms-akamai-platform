@@ -1,82 +1,173 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
-import type { ContentEntry, Paginated } from '@/lib/types';
-import Link from 'next/link';
 
-const STATUS_COLORS: Record<string, string> = {
-  published: 'bg-green-100 text-green-700',
-  draft: 'bg-gray-100 text-gray-600',
-  in_review: 'bg-yellow-100 text-yellow-700',
-  scheduled: 'bg-blue-100 text-blue-700',
-  archived: 'bg-red-100 text-red-600',
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
+import { Plus, Search } from 'lucide-react';
+import { api } from '@/lib/api';
+import type { ContentEntry, ContentStatus, Paginated } from '@/lib/types';
+import { useActiveSite } from '@/lib/active-site';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge, type BadgeProps } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+
+const STATUS_VARIANT: Record<ContentStatus, BadgeProps['variant']> = {
+  published: 'success',
+  draft: 'muted',
+  in_review: 'warning',
+  scheduled: 'default',
+  archived: 'destructive',
 };
 
-export default function ContentPage() {
-  const [data, setData] = useState<Paginated<ContentEntry> | null>(null);
-  const [siteId, setSiteId] = useState('');
-  const [loading, setLoading] = useState(false);
+const TYPES = ['page', 'article', 'post', 'product'] as const;
 
-  async function load() {
-    if (!siteId) return;
-    setLoading(true);
-    try {
-      const res = await api.get(`/admin/content?siteId=${siteId}&size=50`);
-      setData(res.data);
-    } finally {
-      setLoading(false);
-    }
-  }
+async function fetchContent(
+  siteId: string,
+  type: string,
+): Promise<Paginated<ContentEntry>> {
+  const res = await api.get(`/admin/content/${type}?siteId=${siteId}&size=50`);
+  return res.data;
+}
+
+export default function ContentPage() {
+  const [activeSiteId, setActiveSiteId] = useActiveSite();
+  const [siteId, setSiteId] = useState('');
+  const [type, setType] = useState<string>('page');
+
+  useEffect(() => {
+    if (activeSiteId && !siteId) setSiteId(activeSiteId);
+  }, [activeSiteId]);
+
+  const { data, isLoading, isFetching, error } = useQuery({
+    queryKey: ['content', activeSiteId, type],
+    queryFn: () => fetchContent(activeSiteId, type),
+    enabled: !!activeSiteId,
+  });
+
+  const loading = isLoading || isFetching;
+  const errorMessage = error
+    ? (error as any).response?.data?.message || (error as Error).message
+    : '';
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center gap-4 max-w-7xl mx-auto">
-          <Link href="/dashboard" className="text-gray-500 hover:text-gray-900 text-sm">← Dashboard</Link>
-          <h1 className="text-xl font-semibold text-gray-900">Content</h1>
-        </div>
-      </header>
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        <div className="flex gap-3 mb-6">
-          <input value={siteId} onChange={e => setSiteId(e.target.value)}
-            placeholder="Site ID" className="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1 max-w-xs" />
-          <button onClick={load} disabled={loading || !siteId}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">
-            Load
-          </button>
-        </div>
-        {data && (
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-100 text-sm text-gray-500">{data.total} entries</div>
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-gray-600 text-xs uppercase">
-                <tr>
-                  {['Type', 'Slug', 'Locale', 'Status', 'Updated'].map(h => (
-                    <th key={h} className="text-left px-4 py-3 font-medium">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {data.items.map(entry => (
-                  <tr key={entry.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-mono text-xs text-gray-600">{entry.contentType}</td>
-                    <td className="px-4 py-3">{entry.slug}</td>
-                    <td className="px-4 py-3 text-gray-500">{entry.locale}</td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[entry.status] || ''}`}>
-                        {entry.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-500">
-                      {new Date(entry.updatedAt).toLocaleDateString()}
-                    </td>
-                  </tr>
+    <>
+      <PageHeader
+        title="Content"
+        description="Manage pages, posts, and content entries by site."
+        breadcrumbs={[
+          { label: 'dimi-cms', href: '/dashboard' },
+          { label: 'Content Delivery' },
+          { label: 'Content' },
+        ]}
+        actions={
+          <Button asChild size="sm" disabled={!activeSiteId}>
+            <Link
+              href={`/content/new?siteId=${encodeURIComponent(activeSiteId || '')}&type=${type}`}
+            >
+              <Plus className="h-4 w-4" />
+              New entry
+            </Link>
+          </Button>
+        }
+      />
+
+      <div className="flex flex-col gap-4 px-6 py-6">
+        <Card>
+          <CardContent className="flex flex-wrap items-center gap-3 p-4">
+            <Input
+              value={siteId}
+              onChange={(e) => setSiteId(e.target.value)}
+              placeholder="Site ID (UUID)"
+              className="max-w-sm"
+            />
+            <Select value={type} onValueChange={setType}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TYPES.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </SelectContent>
+            </Select>
+            <Button
+              onClick={() => siteId && setActiveSiteId(siteId)}
+              disabled={loading || !siteId}
+              size="sm"
+            >
+              <Search className="h-4 w-4" />
+              {loading ? 'Loading…' : 'Load'}
+            </Button>
+            {data && (
+              <span className="ml-auto text-xs text-muted-foreground">
+                {data.total} entries · page {data.page}
+              </span>
+            )}
+          </CardContent>
+        </Card>
+
+        {errorMessage && (
+          <Card>
+            <CardContent className="py-4 text-sm text-destructive">{errorMessage}</CardContent>
+          </Card>
         )}
-      </main>
-    </div>
+
+        {data && (
+          <Card className="overflow-hidden p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Slug</TableHead>
+                  <TableHead>Locale</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Updated</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.items.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
+                      No content yet for {type}. Create one with “New entry”.
+                    </TableCell>
+                  </TableRow>
+                )}
+                {data.items.map((entry) => (
+                  <TableRow key={entry.id}>
+                    <TableCell className="font-medium">
+                      <Link href={`/content/${entry.id}`} className="hover:underline">
+                        {entry.currentVersion?.title || entry.slug}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{entry.slug}</TableCell>
+                    <TableCell className="font-mono text-xs uppercase text-muted-foreground">
+                      {entry.locale}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={STATUS_VARIANT[entry.status] || 'muted'}>{entry.status}</Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {new Date(entry.updatedAt).toLocaleDateString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        )}
+      </div>
+    </>
   );
 }
